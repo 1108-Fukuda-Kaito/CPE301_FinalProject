@@ -3,6 +3,8 @@
 #include <avr/interrupt.h>
 #include "DHT.h"
 #include <LiquidCrystal.h>
+#include <RTClib.h>
+#include <Wire.h>
 
 // LCD Digital Pins
 const int RS = 52, EN = 53, D4 = 44, D5 = 45, D6 = 47, D7 = 46;
@@ -22,10 +24,10 @@ volatile unsigned char *myTIMSK1 = (unsigned char *)0x6F;
 volatile unsigned int  *myTCNT1  = (unsigned int *)0x84;
 volatile unsigned char *myTIFR1  = (unsigned char *)0x36;
 
-// ADC registers
-volatile unsigned char *myADMUX  = (unsigned char *)0x7C;
-volatile unsigned char *myADCSRA = (unsigned char *)0x7A;
-volatile unsigned int  *myADC    = (unsigned int *)0x78;
+// ADC registers (NEW)
+volatile unsigned char *myADMUX  = (unsigned char *)0x7C;   // NEW
+volatile unsigned char *myADCSRA = (unsigned char *)0x7A;   // NEW
+volatile unsigned int  *myADC    = (unsigned int *)0x78;    // NEW
 
 #define TBE 0x20
 
@@ -39,14 +41,17 @@ volatile unsigned int  *myADC    = (unsigned int *)0x78;
 #define LED_ERROR     3
 
 #define FAN_PIN   6
-#define PHOTO_PIN 0
+#define PHOTO_PIN 0   // NEW
 
 #define DHTPIN  2
 #define DHTTYPE DHT11
 
-#define HUMIDITY_THRESHOLD 40
-#define TEMP_THRESHOLD 22.8
+#define HUMIDITY_THRESHOLD 40   // NEW
+#define TEMP_THRESHOLD 22.8   // NEW
 
+RTC_DS1307 rtc;
+const char dayInWords[7][4] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
+const char monthInWords[13][4] = {" ", "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"};
 
 enum State {
   DISABLED,
@@ -76,7 +81,7 @@ void U0print_string(const char* str);
 
 void init_hardware(void);
 void temp_humid_sensor();
-void read_light_sensor();
+void read_light_sensor();   // NEW
 void control_fan(bool turnOn);
 void my_delay_ms(unsigned int ms);
 void transitionTo(State newState);
@@ -89,7 +94,15 @@ void setup() {
   init_hardware();
   sei();
   lcd.begin(16, 2);
+  rtc.begin();
   transitionTo(currentState);
+  DateTime now = rtc.now();
+
+  // If year looks invalid, force init
+  if (now.year() < 2024 || now.year() > 2100) {
+    Serial.println("Invalid RTC time, resetting...");
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  }
 }
 
 void loop() {
@@ -119,12 +132,12 @@ void loop() {
 
     case IDLE:
       temp_humid_sensor();
-      read_light_sensor();
+      read_light_sensor();   // NEW
       break;
 
     case RUNNING:
       temp_humid_sensor();
-      read_light_sensor();
+      read_light_sensor();   // NEW
       break;
 
     case ERROR:
@@ -166,11 +179,11 @@ void init_hardware(void) {
 
   DDRC |= (1 << FAN_PIN);
 
-  DDRC &= ~(1 << PHOTO_PIN);
+  DDRC &= ~(1 << PHOTO_PIN);   // NEW
 
-  *myADMUX = (1 << REFS0);
+  *myADMUX = (1 << REFS0);     // NEW
 
-  *myADCSRA = (1 << ADEN) |
+  *myADCSRA = (1 << ADEN) |    // NEW
               (1 << ADPS2) |
               (1 << ADPS1) |
               (1 << ADPS0);
@@ -208,16 +221,16 @@ void control_fan(bool turnOn) {
 
 void read_light_sensor() {
 
-  static unsigned long lastPhotoRead = 0;
-  unsigned long now = millis();
+  static unsigned long lastPhotoRead = 0;   // NEW
+  unsigned long now = millis();             // NEW
 
-  if (now - lastPhotoRead >= 500 && currentState != ERROR) {
-    lastPhotoRead = now;
+  if (now - lastPhotoRead >= 500 && currentState != ERROR) {         // NEW
+    lastPhotoRead = now;                    // NEW
 
-    *myADCSRA |= (1 << ADSC);
-    while (*myADCSRA & (1 << ADSC));
+    *myADCSRA |= (1 << ADSC);               // NEW
+    while (*myADCSRA & (1 << ADSC));        // NEW
 
-    unsigned int lightValue = *myADC;
+    unsigned int lightValue = *myADC;       // NEW
 
     if (lightValue == 0 || lightValue >= 1020) {
       if (currentState != ERROR) {
@@ -288,13 +301,48 @@ void temp_humid_sensor() {
     }
   }
 }
+void RTC_update(){
+  DateTime rtcTime = rtc.now();
+  char ss[3];
+  char mm[3];
+  char hh[3];
+  char dd[3];
+  char yyyy[5];
+  itoa(rtcTime.second(), ss, 10);
+  itoa(rtcTime.minute(), mm, 10);
+  itoa(rtcTime.twelveHour(), hh, 10);
+  itoa(rtcTime.day(), dd, 10);
+  itoa(rtcTime.year(), yyyy, 10);
+  U0putchar('\n');
+  if (rtcTime.day() < 10) U0putchar('0');  // add preceeding '0' if number is less than 10
+  U0print_string(dd);
+  U0putchar('-');
+  U0print_string(monthInWords[rtcTime.month()]);
+  U0putchar('-');
+  U0print_string(yyyy);
+  U0putchar(' ');
+  U0print_string(dayInWords[rtcTime.dayOfTheWeek()]);
+  U0putchar(' ');
+  if (rtcTime.twelveHour() < 10) U0putchar('0');
+  U0print_string(hh);
+  U0putchar(':');
 
+  if (rtcTime.minute() < 10) U0putchar('0');
+  U0print_string(mm);
+  U0putchar(':');
+
+  if (rtcTime.second() < 10) U0putchar('0');
+  U0print_string(ss);
+
+  if (rtcTime.isPM()) U0print_string(" PM"); // print AM/PM indication
+  else U0print_string(" AM");
+  U0putchar('\n');
+}
 void transitionTo(State newState) {
 
   currentState = newState;
-
+  RTC_update();
   switch (newState) {
-
     case DISABLED:
       U0print_string("STATE: Disabled\n");
       control_fan(false);
