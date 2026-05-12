@@ -1,3 +1,4 @@
+// Kaito Fukuda, Justin Ly, Aleena Kahn, COdy Masterson
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include "DHT.h"
