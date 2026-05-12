@@ -22,7 +22,7 @@ volatile unsigned char *myTIMSK1 = (unsigned char *)0x6F;
 volatile unsigned int  *myTCNT1  = (unsigned int *)0x84;
 volatile unsigned char *myTIFR1  = (unsigned char *)0x36;
 
-// ADC registers (NEW)
+// ADC registers
 volatile unsigned char *myADMUX  = (unsigned char *)0x7C;
 volatile unsigned char *myADCSRA = (unsigned char *)0x7A;
 volatile unsigned int  *myADC    = (unsigned int *)0x78;
@@ -76,7 +76,7 @@ void U0print_string(const char* str);
 
 void init_hardware(void);
 void temp_humid_sensor();
-void read_light_sensor();   // NEW
+void read_light_sensor();
 void control_fan(bool turnOn);
 void my_delay_ms(unsigned int ms);
 void transitionTo(State newState);
