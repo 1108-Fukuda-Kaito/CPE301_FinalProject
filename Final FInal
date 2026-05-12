@@ -24,9 +24,9 @@ volatile unsigned int  *myTCNT1  = (unsigned int *)0x84;
 volatile unsigned char *myTIFR1  = (unsigned char *)0x36;
 
 // ADC registers (NEW)
-volatile unsigned char *myADMUX  = (unsigned char *)0x7C;   // NEW
-volatile unsigned char *myADCSRA = (unsigned char *)0x7A;   // NEW
-volatile unsigned int  *myADC    = (unsigned int *)0x78;    // NEW
+volatile unsigned char *myADMUX  = (unsigned char *)0x7C;  
+volatile unsigned char *myADCSRA = (unsigned char *)0x7A;   
+volatile unsigned int  *myADC    = (unsigned int *)0x78;    
 
 #define TBE 0x20
 
@@ -40,13 +40,13 @@ volatile unsigned int  *myADC    = (unsigned int *)0x78;    // NEW
 #define LED_ERROR     3
 
 #define FAN_PIN   6
-#define PHOTO_PIN 0   // NEW
+#define PHOTO_PIN 0
 
 #define DHTPIN  2
 #define DHTTYPE DHT11
 
-#define HUMIDITY_THRESHOLD 40   // NEW
-#define TEMP_THRESHOLD 22.8   // NEW
+#define HUMIDITY_THRESHOLD 40
+#define TEMP_THRESHOLD 22.6
 
 RTC_DS1307 rtc;
 const char dayInWords[7][4] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
@@ -80,7 +80,7 @@ void U0print_string(const char* str);
 
 void init_hardware(void);
 void temp_humid_sensor();
-void read_light_sensor();   // NEW
+void read_light_sensor();
 void control_fan(bool turnOn);
 void my_delay_ms(unsigned int ms);
 void transitionTo(State newState);
@@ -97,7 +97,6 @@ void setup() {
   transitionTo(currentState);
   DateTime now = rtc.now();
 
-  // If year looks invalid, force init
   if (now.year() < 2024 || now.year() > 2100) {
     Serial.println("Invalid RTC time, resetting...");
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
@@ -131,12 +130,12 @@ void loop() {
 
     case IDLE:
       temp_humid_sensor();
-      read_light_sensor();   // NEW
+      read_light_sensor();
       break;
 
     case RUNNING:
       temp_humid_sensor();
-      read_light_sensor();   // NEW
+      read_light_sensor();
       break;
 
     case ERROR:
@@ -178,11 +177,11 @@ void init_hardware(void) {
 
   DDRC |= (1 << FAN_PIN);
 
-  DDRC &= ~(1 << PHOTO_PIN);   // NEW
+  DDRC &= ~(1 << PHOTO_PIN);   
 
-  *myADMUX = (1 << REFS0);     // NEW
+  *myADMUX = (1 << REFS0);
 
-  *myADCSRA = (1 << ADEN) |    // NEW
+  *myADCSRA = (1 << ADEN) |
               (1 << ADPS2) |
               (1 << ADPS1) |
               (1 << ADPS0);
@@ -220,16 +219,16 @@ void control_fan(bool turnOn) {
 
 void read_light_sensor() {
 
-  static unsigned long lastPhotoRead = 0;   // NEW
-  unsigned long now = millis();             // NEW
+  static unsigned long lastPhotoRead = 0;   
+  unsigned long now = millis();             
 
-  if (now - lastPhotoRead >= 500 && currentState != ERROR) {         // NEW
-    lastPhotoRead = now;                    // NEW
+  if (now - lastPhotoRead >= 500 && currentState != ERROR) {         
+    lastPhotoRead = now;                    
 
-    *myADCSRA |= (1 << ADSC);               // NEW
-    while (*myADCSRA & (1 << ADSC));        // NEW
+    *myADCSRA |= (1 << ADSC);               
+    while (*myADCSRA & (1 << ADSC));        
 
-    unsigned int lightValue = *myADC;       // NEW
+    unsigned int lightValue = *myADC;       
 
     if (lightValue == 0 || lightValue >= 1020) {
       if (currentState != ERROR) {
@@ -281,7 +280,6 @@ void temp_humid_sensor() {
       update_lcd(t,h,currentState);
     }
 
-    // if (h > HUMIDITY_THRESHOLD) {   // MODIFIED LOGIC
     if (t > TEMP_THRESHOLD) {
       if (currentState == IDLE) {
         transitionTo(RUNNING);
@@ -313,7 +311,7 @@ void RTC_update(){
   itoa(rtcTime.day(), dd, 10);
   itoa(rtcTime.year(), yyyy, 10);
   U0putchar('\n');
-  if (rtcTime.day() < 10) U0putchar('0');  // add preceeding '0' if number is less than 10
+  if (rtcTime.day() < 10) U0putchar('0'); 
   U0print_string(dd);
   U0putchar('-');
   U0print_string(monthInWords[rtcTime.month()]);
@@ -333,7 +331,7 @@ void RTC_update(){
   if (rtcTime.second() < 10) U0putchar('0');
   U0print_string(ss);
 
-  if (rtcTime.isPM()) U0print_string(" PM"); // print AM/PM indication
+  if (rtcTime.isPM()) U0print_string(" PM"); 
   else U0print_string(" AM");
   U0putchar('\n');
 }
@@ -355,7 +353,6 @@ void transitionTo(State newState) {
       control_fan(false);
       set_leds(1, 0, 0, 0);
       lcd.clear();
-      // lcd.print("STATE: Idle");
       break;
 
     case RUNNING:
